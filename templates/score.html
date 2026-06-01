@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Session score{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Session score</h1>
+<p>
+  Correct: <strong>{{ score.correct }}</strong> /
+  Total:   <strong>{{ score.total }}</strong>
+  {% if score.total %}({{ (100*score.correct//score.total) }}%){% endif %}
+</p>
+
+{% if score.wrong %}
+  <h2 class="h5">Wrong QIDs ({{ score.wrong|length }})</h2>
+  <p>
+    {% for qid in score.wrong %}
+      <a href="{{ url_for('question_detail', qid=qid) }}" class="me-2">{{ qid }}</a>
+    {% endfor %}
+  </p>
+{% else %}
+  <p class="text-muted">No wrong answers in this session.</p>
+{% endif %}
+
+<a class="btn btn-outline-secondary" href="{{ url_for('reset') }}">Reset session</a>
+<a class="btn btn-primary" href="{{ url_for('quiz') }}">Back to quiz</a>
+{% endblock %}

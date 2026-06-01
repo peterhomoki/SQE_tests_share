@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Export ready{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Export ready</h1>
+
+<div class="alert alert-success">
+  Your {{ "PDF" if kind == "pdf" else "Anki deck" }} has been generated.
+</div>
+
+<p>
+  <a class="btn btn-primary" href="{{ url_for('downloads', filename=filename) }}">
+    Download <code>{{ filename }}</code>
+  </a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('export') }}">Make another</a>
+</p>
+
+<p class="text-muted small mt-3">
+  The file is stored in the <code>downloads/</code> folder. If your browser
+  blocks the download (some browsers cache attachments), you can also open it
+  from there directly.
+</p>
+{% endblock %}

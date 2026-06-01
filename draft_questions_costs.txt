@@ -1,0 +1,413 @@
+SQE1 Question Drafting — Cost Estimates
+========================================
+Generated: 2026-05-30
+Model: claude-opus-4-8
+Source: draft_questions.py + prompt caching on subject manuals
+
+
+1. ANTHROPIC LIST PRICES (per 1M tokens)
+----------------------------------------
+   Input (non-cached)          $15.00
+   Output                      $75.00
+   Cache write (creation)      $18.75   (+25% on input)
+   Cache read (retrieval)      $ 1.50   (-90% on input)
+
+   Ephemeral cache TTL: 5 minutes of idle time.
+
+
+2. PER-CALL TOKEN PROFILE (observed)
+------------------------------------
+   Cached system block (skill + ignore guide + subject manual(s)):
+     SA              ~ 60,000 tokens
+     CL, LeSe, Ethics ~80–95k
+     LL, TL, T, WAE, PLP, DR  ~110–155k
+     CrL             ~140k
+     CrLP            ~215k
+     BLP             ~216k
+     LSy             ~390k  (Legal System + Constitutional combined)
+
+   Non-cached input (user prompt + examples): ~1,300 tokens
+   Output (one full MCQ + explanations + meta): ~800 tokens
+
+
+3. PER-CALL COST
+----------------
+   First question in a subject (cache write):
+     ~3,900 tokens written + 1,300 input + 800 output
+
+     Worked example for DR (206k cache):
+       Cache write: 206,000 × $18.75/M = $3.86
+       Input:         1,300 × $15.00/M = $0.02
+       Output:          800 × $75.00/M = $0.06
+       TOTAL FIRST CALL                ≈ $3.94
+
+   Each subsequent question within 5 min, same subject (cache read):
+       Cache read:  206,000 × $1.50/M  = $0.31
+       Input:         1,300 × $15.00/M = $0.02
+       Output:          800 × $75.00/M = $0.06
+       TOTAL CACHED CALL                ≈ $0.39
+
+   First question after >5 min idle: cache expired → another write ≈ $3.94
+
+
+4. RULE OF THUMB
+----------------
+   First call in a subject:        $1.10 – $7.30  (varies by subject size)
+   Each subsequent call same subj: $0.20 – $0.65  (mostly the cache read)
+   Output cost is negligible (~$0.06 per question regardless).
+
+   The economics favour generating many questions per subject in one
+   sitting. Generating just 1–2 questions per subject is wasteful because
+   the cache load dominates.
+
+
+5. PLAN ESTIMATES
+-----------------
+   Plan A — Weakness drill  (plan_a_weakness.csv)
+     50 questions across 8 subjects
+       8 cache writes  ≈ $22
+      42 cache reads   ≈ $16
+     ────────────────────────
+     TOTAL                ≈ $38
+     ≈ $0.76 per question
+
+   Plan B — Coverage fill  (plan_b_coverage.csv)
+     128 questions across 3 subjects (PLP + CrLP + DR)
+       3 cache writes  ≈ $10
+     125 cache reads   ≈ $49
+     ────────────────────────
+     TOTAL                ≈ $59
+     ≈ $0.46 per question  ← most cost-efficient per Q
+
+   Plan C — Balanced  (plan_c_balanced.csv)
+     49 questions across 9 subjects
+       9 cache writes  ≈ $25
+      40 cache reads   ≈ $16
+     ────────────────────────
+     TOTAL                ≈ $41
+     ≈ $0.84 per question
+
+
+6. SUBJECT-BY-SUBJECT FIRST-CALL ESTIMATE
+-----------------------------------------
+   Approximate cost of the FIRST question for each subject (cache write
+   + small input + output). Add ~$0.39 per subsequent question in the
+   same subject within 5 minutes.
+
+      Subject        Cache size    First call    +Each more
+      ─────────────────────────────────────────────────────
+      SA              60k          $1.21         $0.17
+      CL              92k          $1.81         $0.22
+      Ethics          84k          $1.66         $0.20
+      LeSe (+Ethics)  170k         $3.27         $0.34
+      WAE            135k          $2.61         $0.28
+      TL             143k          $2.76         $0.30
+      LL             111k          $2.17         $0.25
+      T              141k          $2.72         $0.29
+      DR             152k          $2.93         $0.31
+      PLP            150k          $2.90         $0.30
+      CrL            138k          $2.67         $0.29
+      BLP            216k          $4.13         $0.40
+      CrLP           215k          $4.11         $0.40
+      LSy (+Const)   392k          $7.43         $0.69
+
+   These are estimates; actual usage will vary ±10–15%.
+
+
+7. COST-MINIMISATION TIPS
+-------------------------
+   - Run a plan in ONE sitting; cache expires after 5 minutes of idle.
+   - The script auto-sorts targets by area so same-subject calls run
+     back-to-back. Don't break that order.
+   - If you only need 1–2 questions per subject, expect the cache
+     overhead to dominate (≈ $2–$4 per subject regardless).
+   - For LSy, both Legal System and Constitutional manuals are loaded
+     (390k tokens) — this is the most expensive subject. Cluster all
+     LSy work into a single uninterrupted run.
+   - --dry-run still costs the API call. Use it once per subject to
+     judge quality, then commit (or skip) the plan.
+
+
+8. DEEPSEEK PRO ALTERNATIVE
+---------------------------
+   DeepSeek Pro effective price (calibrated from the actual SQE1
+   answering benchmark — see note below):
+     Input  (cache miss)   $0.55 / M
+     Input  (cache hit)    $0.14 / M   (automatic prompt caching)
+     Output                $0.13 / M   (calibrated; lower than R1
+                                       reasoner list price)
+
+   Calibration note: the SQE1 answering benchmark with DeepSeek Pro
+   cost $0.081 for 580 questions, averaging ~716 output tokens per
+   call. Backing out from that observed total implies output
+   pricing of ~$0.13/M — substantially lower than the $2.19/M I
+   originally used (which was the R1 reasoner list price). The
+   numbers below have been re-estimated using the calibrated rate.
+
+   Token profile assumed per call:
+     Input  ~150k cached + 1.3k user prompt
+     Output ~1,300 useful tokens (the structured question)
+              + reasoning overhead within max_tokens.
+
+   Per-call cost:
+     First call in subject (cache miss on 150k system block)
+       Input   150,000 × $0.55/M = $0.083
+       Output    1,300 × $0.13/M = $0.0002
+       TOTAL                     ≈ $0.08
+     Subsequent call (automatic cache hit)
+       Input   150,000 × $0.14/M = $0.021
+       Output    1,300 × $0.13/M = $0.0002
+       TOTAL                     ≈ $0.02
+
+   Plan totals — DeepSeek Pro alone (revised):
+     Plan A — Weakness drill   ~$1.55    (vs Opus $38)
+     Plan B — Coverage fill    ~$2.88    (vs Opus $59)
+     Plan C — Balanced         ~$1.59    (vs Opus $41)
+
+
+9. HYBRID: DEEPSEEK DRAFT + OPUS 4.8 VERIFY
+-------------------------------------------
+   Workflow:
+     1. DeepSeek Pro drafts each question (cheap, may contain errors).
+     2. Opus 4.8 reviews each draft against the SKILL and outputs
+        either approval or a corrected version.
+
+   Verification call token profile:
+     Input  — drafted question to review (~1,400 tokens)
+     Output — average of "approved + brief note" (~100 tokens) and
+              "full rewrite + reasoning" (~1,000 tokens) ≈ 600 tokens
+
+   Two verification depths:
+
+   A) LIGHT VERIFY — Opus checks SKILL compliance only
+      (skill.md + draft sent; relies on DeepSeek for legal accuracy)
+
+      Skill block is cached (ephemeral cache_control), so the 2k
+      skill is charged at cache-write rate on the first call and
+      cache-read rate thereafter.
+
+      Per call (observed, calibrated from a real verify run):
+        Skill (cached after first call)        ~ $0.003 – $0.038
+        Draft input      1,400 × $15.00/M     = $0.021
+        Output           1,700 × $75.00/M     = $0.128
+        TOTAL FIRST CALL                       ≈ $0.21
+        TOTAL CACHED CALL                      ≈ $0.18
+
+   B) HEAVY VERIFY — Opus checks SKILL + legal accuracy
+      (skill + study materials + draft sent — same cached prefix as
+      the original Opus drafting calls)
+
+      Per call:
+        First in subject  (cache write 150k system block)  ≈ $2.88
+        Cached call       (cache read  150k system block)  ≈ $0.29
+
+
+   COMBINED TOTALS (drafting + verify) — REVISED
+
+       Plan A — Weakness drill (50 questions, 8 subjects)
+         DeepSeek drafting                                $1.55
+         + Light verify : 8 × $0.21 + 42 × $0.18          $9.24
+         + Heavy verify : 8 × $2.88 + 42 × $0.29          $35.22
+         ─────────────────────────────────────────────────────────
+         DeepSeek + light verify                       ≈ $11
+         DeepSeek + heavy verify                       ≈ $37
+         (Opus drafting alone                          ≈ $38)
+
+       Plan B — Coverage fill (128 questions, 3 subjects)
+         DeepSeek drafting                                $2.88
+         + Light verify : 3 × $0.21 + 125 × $0.18         $23.13
+         + Heavy verify : 3 × $2.88 + 125 × $0.29         $44.89
+         ─────────────────────────────────────────────────────────
+         DeepSeek + light verify                       ≈ $26
+         DeepSeek + heavy verify                       ≈ $48
+         (Opus drafting alone                          ≈ $59)
+
+       Plan C — Balanced (49 questions, 9 subjects)
+         DeepSeek drafting                                $1.59
+         + Light verify : 9 × $0.21 + 40 × $0.18          $9.09
+         + Heavy verify : 9 × $2.88 + 40 × $0.29          $37.52
+         ─────────────────────────────────────────────────────────
+         DeepSeek + light verify                       ≈ $11
+         DeepSeek + heavy verify                       ≈ $40
+         (Opus drafting alone                          ≈ $41)
+
+
+   SUMMARY TABLE (REVISED)                  Plan A  Plan B  Plan C
+
+     Opus 4.8 — draft alone                  $38     $59     $41
+     DeepSeek Pro — draft alone              $2      $3      $2
+     DeepSeek + Opus light verify            $11     $26     $11
+     DeepSeek + Opus heavy verify            $37     $48     $40
+
+
+10. RECOMMENDATION
+------------------
+    - For BULK coverage (Plan B): hybrid with LIGHT verify saves the
+      most ($17 vs $59, -71%). DeepSeek handles volume cheaply, Opus
+      catches structural skill-compliance errors.
+    - For TARGETED weakness drilling (Plans A, C): light verify also
+      saves significantly (~$30) but the absolute spend is already
+      modest. If you want maximum legal accuracy on your weakest
+      topics, Opus-only is worth the extra dollars.
+    - HEAVY verify defeats the cost advantage of DeepSeek almost
+      entirely — only useful if DeepSeek's legal accuracy proves
+      too unreliable to trust on the substance.
+    - Best practice: PILOT 5–10 questions with each pipeline and
+      manually compare quality before committing to a plan.
+
+
+11. QUALITY CAVEATS — DEEPSEEK
+------------------------------
+    - DeepSeek Pro's English-and-Wales legal precision is unproven
+      against Opus 4.8 — they performed measurably worse on the SQE1
+      answer-the-question benchmark already run; drafting accuracy
+      likely follows.
+    - Structured JSON output is stricter on Anthropic. Expect higher
+      parse-failure rates on DeepSeek; the verify step will catch
+      structural defects but not all subtle errors.
+    - The 3× output multiplier is conservative for an open-ended
+      drafting task. If DeepSeek's reasoning is heavier here, scale
+      DeepSeek totals upward by up to 1.5×.
+
+
+12. UPDATE 2026-05-31 — REAL DATA FROM RECENT RUNS
+---------------------------------------------------
+   New data points from actual runs (compare to earlier estimates):
+
+   DeepSeek Flash answering 580 questions:
+     Before fix (max_tokens=1024): 60.4% success, 204 INVALID truncations
+     After fix  (max_tokens=4096): 87.3% success, 3 INVALID
+     Cost     : pennies, output averaged 1,134 tokens / question
+
+   DeepSeek Pro answering 580 questions:
+     84.5% success, 90 wrong; output spend ≈ $0.08 (calibration data)
+
+   Haiku 4.5 with 1024 thinking budget (3-question sample):
+     Avg output: 482 tokens / Q  (well under the 1024 cap)
+     Cost projection for 580 Q at 1024 budget: ~$1.30
+
+
+   ANTHROPIC + THINKING — projected costs (580 questions)
+   ------------------------------------------------------
+   Output tokens/Q estimated as max(~500, 0.6 × budget) — calibrated
+   from the Haiku 1024 sample (≈ 47% of budget used).
+
+     Model              Budget   Output/Q (avg)   Total cost
+     ───────────────────────────────────────────────────────
+     Haiku 4.5          2K       ~1,200           ~$3
+     Haiku 4.5          4K       ~2,400           ~$6
+     Haiku 4.5          16K      ~9,600           ~$22
+     Sonnet 4.6         2K       ~1,200           ~$11
+     Sonnet 4.6         4K       ~2,400           ~$22
+     Sonnet 4.6         16K      ~9,600           ~$84
+     Opus 4.8           2K       ~1,200           ~$53
+     Opus 4.8           4K       ~2,400           ~$105
+     Opus 4.8           16K      ~9,600           ~$418
+
+   For TARGETED reruns on only the ~75-90 wrong QIDs, divide by ~7.
+   E.g. Opus 4.8 with 4K thinking on 90 wrong QIDs ≈ $16.
+
+
+   VERIFIER (light, draft_questions.py) — projected per-call cost
+   --------------------------------------------------------------
+     Verifier           Budget   Per call (cached skill)
+     ────────────────────────────────────────────────────
+     opus (one-shot)    0        $0.18
+     opus-think2k       2K       $0.34
+     opus-think4k       4K       $0.48
+     opus-think16k      16K      $1.30
+
+   Per-plan verify totals (cached skill block):
+     Plan A — 50 questions   :  $9 / $17 / $24 / $65 (one-shot/2K/4K/16K)
+     Plan B — 128 questions  :  $23 / $43 / $61 / $166
+     Plan C — 49 questions   :  $9 / $17 / $24 / $64
+
+
+13. UPDATE 2026-05-31 — STRIPPED MANUALS (TIER-1 RULES APPLIED)
+---------------------------------------------------------------
+   strip_manuals.py was applied to all 15 study manuals, producing
+   cleaned copies in toconsider_stripped/. draft_questions.py now
+   reads from that directory (MAT_DIR = ROOT / "toconsider_stripped").
+
+   Strip rules used (all Tier 1):
+     - Headings: preface / contents / table_of_cases / table_of_stat
+       / sqe1_syllabus / learning_outcomes / sample_questions / index
+     - Plain-text promotion: "Sample questions" et al. (PDF→MD artefact)
+       converted to "## Sample questions" so the walker can see them
+     - Inline detection: "By the end of this chapter, you should be able
+       to..." paragraph blocks
+     - Back-matter truncation: plain-text "INDEX" or "Appendix N…" in
+       the back half of the file → cut to EOF
+
+   Overall token reduction:
+     Total original tokens   : 2,116,529
+     Total stripped tokens   : 1,680,382
+     SAVED                   :   436,147   (20.6%)
+
+   Per-subject (cache prefix is now smaller):
+
+     Subject        Original    Stripped    Saved %    First-call  +Each more
+     ────────────────────────────────────────────────────────────────────────
+     SA              60k         46k        -22.9%       $0.95       $0.13
+     CL              92k         67k        -27.6%       $1.33       $0.16
+     Ethics          84k         62k        -25.6%       $1.24       $0.15
+     LeSe (+Ethics) 170k        130k        -23.5%       $2.51       $0.27
+     WAE            135k        107k        -20.2%       $2.07       $0.23
+     LL             111k         89k        -19.9%       $1.73       $0.20
+     TL             143k        101k        -28.9%       $1.96       $0.22
+     T              141k        103k        -27.1%       $1.99       $0.22
+     CrL            138k        108k        -21.6%       $2.09       $0.23
+     DR             152k        125k        -17.8%       $2.41       $0.26
+     PLP            150k        122k        -18.7%       $2.36       $0.25
+     CrLP           215k        177k        -17.7%       $3.41       $0.34
+     BLP            216k        184k        -14.7%       $3.55       $0.35
+     LSy (+Const)   392k        324k        -17.4%       $6.16       $0.58
+
+     (Approximate Opus 4.8 list-price; output cost ~$0.06 baked in.)
+
+
+   Plan totals — REVISED again with stripped manuals
+   -------------------------------------------------
+   With ~20% smaller cache prefix per subject:
+
+   Plan A — Weakness drill (50 q, 8 subjects)
+     Opus draft alone                            ~$31   (was $38)
+     DeepSeek Pro draft alone                    ~$1.3  (was $1.85)
+     DeepSeek + Opus light verify                ~$10   (was $11)
+     DeepSeek + Opus heavy verify                ~$30   (was $37)
+
+   Plan B — Coverage fill (128 q, 3 subjects)
+     Opus draft alone                            ~$47   (was $59)
+     DeepSeek Pro draft alone                    ~$2.5  (was $3.65)
+     DeepSeek + Opus light verify                ~$24   (was $26)
+     DeepSeek + Opus heavy verify                ~$40   (was $48)
+
+   Plan C — Balanced (49 q, 9 subjects)
+     Opus draft alone                            ~$33   (was $41)
+     DeepSeek Pro draft alone                    ~$1.4  (was $1.89)
+     DeepSeek + Opus light verify                ~$10   (was $11)
+     DeepSeek + Opus heavy verify                ~$33   (was $40)
+
+
+   SUMMARY TABLE (POST-STRIPPING)              Plan A  Plan B  Plan C
+
+     Opus 4.8 — draft alone                      $31     $47     $33
+     DeepSeek Pro — draft alone                  $1.3    $2.5    $1.4
+     DeepSeek + Opus light verify                $10     $24     $10
+     DeepSeek + Opus heavy verify                $30     $40     $33
+
+
+   Bottom line
+   -----------
+   Stripping saved roughly 15-20% off the heavy "Opus drafting" and
+   "DeepSeek + heavy verify" pipelines, because both pay the cache
+   write/read on the full subject material. The light-verify pipelines
+   barely move (the verifier already only sees the SKILL, not the
+   manuals).
+
+   The biggest wins are on plans that touch many subjects with few
+   questions each (Plan A, Plan C), because each subject's first-call
+   cost dropped ~$0.50–$0.70.
+
+
+END OF FILE

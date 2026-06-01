@@ -1,0 +1,7 @@
+{
+  "_comment": "Map of area code -> list of supplementary study-material filenames in toconsider_stripped/ that draft_questions.py should attach when drafting a new question for that area. Leave empty ({}) to skip supplementary material. Filenames are looked up relative to MAT_DIR (see draft_questions.py).",
+  "_example": {
+    "BLP": ["my_blp_notes.md"],
+    "CL":  ["contract_summary.txt", "contract_cases.md"]
+  }
+}

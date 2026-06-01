@@ -1,0 +1,299 @@
+# SQE1 Question Bank — Shareable Distribution
+
+A shared, redacted copy of an internal SQE1 question-bank project..
+ 
+## What you get
+
+- **A web UI** (`app.py`) for practicing questions and browsing the bank.
+- **Twelve pipeline scripts** for building / maintaining / benchmarking
+  the database and exporting practice material.
+- **Schema, taxonomy and the four SRA public sample question sets**.
+- **The drafting skill** (`.claude/skills/sqe1-sba-mcq-drafting/SKILL.md`).
+
+## Quick start
+
+1. **Install dependencies**
+
+   ```powershell
+   pip install -r requirements.txt
+   ```
+
+2. **Add API keys**
+
+   Copy `.env.sample` to `.env` and replace the placeholders.
+   - `ANTHROPIC_API_KEY` is needed for any LLM-driven step.
+   - `DEEPSEEK_API_KEY` is optional; only used by `run_llm_test.py` and
+     `draft_questions.py` when you pick a DeepSeek model to draft new questions.
+
+3. **The database is already included**
+
+   `sqe1.db` ships with this distribution. It contains:
+
+   - The **full four-level taxonomy** parsed from
+     `flk1_specification.md` and `flk2_specification.md` (655 topics).
+   - All **220 SRA / Kaplan sample questions** with their five options each.
+   - **All 1,100 option explanations** already populated.
+   - **Topic links** already populated (one classified topic per question).
+
+   You can skip the build steps below and go straight to step 5
+   (launching the UI). The build steps are only relevant if you want
+   to wipe and rebuild the database from scratch, or to re-run the
+   LLM-assisted classification or explanation passes.
+
+4. **(Optional) Rebuild the database from scratch**
+
+   The shipped `sqe1.db` already contains the SRA / Kaplan sample
+   questions, so you only need this step if you want to load a
+   *different* set of source questions. Put your source files into
+   `sources_of_questions/` (see "Bringing your own source questions"
+   below), then:
+
+   ```powershell
+   python ingest.py init                # wipe sqe1.db and reload from sources_of_questions/
+   python classify_questions.py         # re-classify each question (one Claude call per Q)
+   python fill_explanations.py          # re-generate explanations (one Claude call per Q)
+   ```
+
+   These two LLM-assisted steps add real cost. Only run them if you want
+   to reset things — the shipped `sqe1.db` already has the output of
+   both.
+
+5. **Launch the UI**
+
+   ```powershell
+   python app.py
+   ```
+
+   Open <http://localhost:5000> in a browser.
+
+## The web UI
+
+A single-file Flask app that reads `sqe1.db` directly. Pages:
+
+| Route | What it does |
+|---|---|
+| `/` | Dashboard — totals, classification + explanation coverage, questions-per-area, session score |
+| `/quiz` | Pick a random question (optionally filtered by FLK / area). Submit an answer to see whether it was right, the correct letter, and per-option explanations |
+| `/browse` | Filtered list of questions (FLK, area, text search across stem and lead-in); click into a row for the detail page |
+| `/question/<qid>` | Single question detail — stem, lead-in, all five options with the correct one highlighted plus explanations |
+| `/score` | Session score and the list of QIDs you got wrong in this browser session |
+| `/reset` | Clear the session score |
+| `/export` | Form to generate a PDF or Anki deck (all questions, filtered by FLK / area, or restricted to your wrong-list) and a download link when it's ready |
+| `/upload-wrong-qids` | Upload a CSV of QIDs you got wrong elsewhere — kept in your browser session |
+| `/wrong-analysis` | Areas-to-improve summary computed from the uploaded wrong-QIDs CSV |
+| `/downloads/<file>` | Serves generated PDF / Anki files (saved under `downloads/`) |
+
+Notes:
+
+- The UI is session-scoped: the score and the uploaded wrong-QIDs list live
+  in a Flask session cookie. No long-term tracking, no user accounts.
+  Refresh the browser tab to start over, or click "Reset session".
+- Generated PDF / Anki files land in `downloads/` next to `app.py`.
+  They are **not** auto-deleted — clean up the folder when you're done.
+
+## Importing your own incorrect answers
+
+If you've been practising elsewhere (e.g. the SRA's online sample set, or any
+other tool that lets you export wrong-answer QIDs), you can feed that list
+back into this tool to:
+
+1. Get an **areas-to-improve summary** — which lvl-1 areas / lvl-2 fields
+   / lvl-3 subjects you're missing most.
+2. Generate a **PDF or Anki deck of just those questions** for focused
+   re-practice.
+
+The format is intentionally simple — a CSV with one header row and one QID
+per line:
+
+```csv
+qid
+4
+6
+10
+17
+...
+```
+
+The header must be exactly `qid` (lowercase). UTF-8 with or without BOM is
+fine.
+
+**Via the UI:**
+
+1. Click **My errors** in the nav bar (or open `/upload-wrong-qids`).
+2. Pick your CSV → Upload. The QIDs are stored in your browser session.
+3. You'll land on **/wrong-analysis** — the areas-to-improve summary.
+4. From there, **Build a PDF of these only** sends you to the Export page
+   with the "Only my wrong questions" box pre-enabled.
+
+**Via the command line:**
+
+```powershell
+# Areas-to-improve summary (also writes a text file)
+python analyse_errors.py wrong_qids.csv --output errors_summary.txt
+
+# PDF of just the wrong questions
+python make_pdf.py --qids-file wrong_qids.csv --output my_wrong.pdf --seed 42
+
+# Anki deck — same shape
+python make_anki.py --qids-file wrong_qids.csv --output my_wrong.apkg
+```
+
+## Editing the database with SQLiteBrowser
+
+If you want to view, search, or hand-edit any record (fix a typo in an
+explanation, change the correct option for a question, add an extra
+question, etc.), the easiest tool is the free **DB Browser for SQLite** at
+<https://sqlitebrowser.org/>. Available for Windows, macOS, and Linux.
+
+Quick workflow:
+
+1. Download and install **DB Browser for SQLite** from the site above.
+2. Launch it and choose **File → Open Database** → pick this folder's
+   `sqe1.db`.
+3. Use the **Browse Data** tab to pick a table (`questions`, `options`,
+   `topics`, or `question_topics`). Double-click a cell to edit it.
+4. Use the **Execute SQL** tab to run ad-hoc queries, e.g.:
+
+   ```sql
+   -- Show all FLK1 contract questions
+   SELECT q.question_id, q.stem, q.lead_in
+   FROM questions q
+   JOIN question_topics qt ON qt.question_id = q.question_id
+   JOIN topics t ON t.topic_id = qt.topic_id
+   WHERE q.flk = 'FLK1' AND t.code = 'CL';
+   ```
+
+5. **Write Changes** (Ctrl-S) commits to the file. Close the file before
+   launching `app.py` again, or restart `app.py` after editing — the Flask
+   app caches a database connection per browser tab.
+
+> ⚠ Take a backup of `sqe1.db` (or run inside a copy) before doing
+> destructive edits. A schema-validating constraint (e.g. the
+> "exactly one correct option per question" partial unique index) will
+> reject illegal changes, but text edits are accepted without semantic
+> checks.
+
+## The command-line pipeline
+
+You can run everything below without ever opening the UI; the UI is just
+a friendlier view onto the same `sqe1.db`.
+
+### Pipeline scripts
+
+| Script | Purpose |
+|---|---|
+| `ingest.py` | Create `sqe1.db`, load taxonomy + SRA sample questions |
+| `classify_questions.py` | Classify each question to a taxonomy topic via Claude |
+| `fill_explanations.py` | Fill option-by-option explanations via Claude |
+| `generate_test_input.py` | Produce a JSON test-input file for benchmarking |
+| `run_llm_test.py` | Benchmark Anthropic and DeepSeek models on the bank |
+| `draft_questions.py` | Draft new SBA MCQs (draft / verify / import / file modes) |
+| `make_pdf.py` | Export selected questions to a printable PDF |
+| `make_anki.py` | Export selected questions to an Anki `.apkg` |
+| `list_untested_topics.py` | List topics with no questions linked |
+| `topic_breakdown.py` | Topic statistics |
+| `stats.py` | General DB statistics |
+| `analyse_errors.py` | Read a CSV of wrong-answer QIDs and report areas-to-improve |
+| `_list_deepseek_models.py` | Print the live DeepSeek model catalogue |
+
+All scripts respond to `--help`. The cost reference for `draft_questions.py`
+in particular lives in `draft_questions_costs.txt`.
+
+### Common command-line workflows
+
+**Generate a 90-question FLK1 mock PDF**
+
+```powershell
+python make_pdf.py --flk FLK1 --count 90 --output flk1_mock.pdf --seed 42
+```
+
+`--seed N` makes the selection, the question order, and the option-letter
+shuffle reproducible.
+
+**Build an Anki deck on a specific area**
+
+```powershell
+python make_anki.py --area BLP,DR --count 40 --output blp_dr.apkg
+```
+
+**Benchmark a model**
+
+```powershell
+python generate_test_input.py --mode all --output test_all.json
+python run_llm_test.py --input test_all.json --model claude-haiku-4-5
+```
+
+For DeepSeek's reasoning models add `--max-questions 5` first to confirm
+the model ID resolves on your account. With `--thinking-budget N` you can
+enable Anthropic extended thinking; see `run_llm_test.py --help`.
+
+**Draft a new question for a specific topic**
+
+```powershell
+python draft_questions.py --topic-id 48 --drafter opus --dry-run
+python draft_questions.py --topic-ids 48,132 --drafter deepseek-pro --verify
+python draft_questions.py --topic-id 48 --output-file drafts.json   # review-queue
+python draft_questions.py --import-file drafts.json                 # commit to DB
+```
+
+`--verifier {opus,opus-think2k,opus-think4k,opus-think16k}` picks the
+verifier depth. See `draft_questions_costs.txt` for projected costs of
+each combination.
+
+## Schema and taxonomy
+
+| File | Purpose |
+|---|---|
+| `schema.sql` | SQLite schema |
+| `taxonomy.md` | Four-level taxonomy convention |
+| `flk1_specification.md` | SRA FLK1 syllabus, encoded as markdown headings |
+| `flk2_specification.md` | SRA FLK2 syllabus, encoded as markdown headings |
+| `area_abbreviations.csv` | Area-code → name mapping |
+
+`ingest.py init` parses the two specification markdown files to build the
+topics tree and then loads questions from any source files it finds in
+`sources_of_questions/` (see the next section).
+
+## Bringing your own source questions
+
+The `sources_of_questions/` folder ships empty. To rebuild `sqe1.db`
+with a question set, drop your source files there and run
+`python ingest.py init`. Two formats are accepted:
+
+- **`.docx`** — the format SRA / Kaplan publish their sample sets in.
+  See the [SRA SQE1 sample questions page][sra-samples] for the four
+  free public sets you can download as `.docx` and place here directly.
+- **`.txt`** — plain text, one question block per question, in the
+  format documented at the top of `parse_questions_txt` in `ingest.py`:
+
+  ```text
+  Question 1
+  <stem (one or more paragraphs)>
+  <lead-in (a question ending with "?")>
+  A. <option A text>
+  B. <option B text>
+  C. <option C text>
+  D. <option D text>
+  E. <option E text>
+  Answer: B
+
+  Question 2
+  ...
+  ```
+
+The filename must contain an `FLK1` / `FLK2` marker (e.g. `mybank-flk1.txt`)
+so the ingester can label each question with the right paper. Files
+without such a marker are skipped with a warning.
+
+[sra-samples]: https://sqe.sra.org.uk/assessments/sqe1-assessments/sqe1-sample-questions
+
+## License and attribution
+
+The **code, scripts, schema and documentation** in this repository are
+licensed under the MIT License — see [`license.md`](license.md). You
+can use, modify, and redistribute them, including for commercial
+purposes, subject to the conditions in that file.
+
+Any source files **you** add to `sources_of_questions/` are governed by
+whatever terms apply to those files; nothing in this repository grants
+or modifies rights in them.

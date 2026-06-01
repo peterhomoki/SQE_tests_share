@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 class="mb-4">SQE1 Question Bank</h1>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small">Total questions</div>
+      <div class="h3 mb-0">{{ total }}</div>
+      <div class="small text-muted">FLK1: {{ by_flk.get('FLK1', 0) }}
+        · FLK2: {{ by_flk.get('FLK2', 0) }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small">Topic-classified</div>
+      <div class="h3 mb-0">{{ classified }}</div>
+      <div class="small text-muted">of {{ total }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small">All-explanations filled</div>
+      <div class="h3 mb-0">{{ with_all_expl }}</div>
+      <div class="small text-muted">of {{ total }}</div>
+    </div></div>
+  </div>
+  <div class="col-md-3">
+    <div class="card"><div class="card-body">
+      <div class="text-muted small">Session score</div>
+      <div class="h3 mb-0">{{ score.correct }} / {{ score.total }}</div>
+      <div class="small">
+        <a href="{{ url_for('score') }}">View</a> ·
+        <a href="{{ url_for('reset') }}">Reset</a>
+      </div>
+    </div></div>
+  </div>
+</div>
+
+<h2 class="h5">Start a quiz or browse</h2>
+<form action="{{ url_for('quiz') }}" method="get" class="row g-2 align-items-end mb-4">
+  <div class="col-md-3">
+    <label class="form-label">FLK</label>
+    <select name="flk" class="form-select">
+      <option value="">Any</option>
+      <option value="FLK1">FLK1</option>
+      <option value="FLK2">FLK2</option>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Area (optional)</label>
+    <select name="area" class="form-select">
+      <option value="">Any</option>
+      {% for r in by_area_rows %}
+        <option value="{{ r.code }}">{{ r.code }} — {{ r.name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-auto">
+    <button class="btn btn-primary" type="submit">Start quiz →</button>
+    <a class="btn btn-outline-secondary" href="{{ url_for('browse') }}">Browse</a>
+  </div>
+</form>
+
+<h2 class="h5">Questions by area</h2>
+<table class="table table-sm">
+  <thead><tr><th>FLK</th><th>Code</th><th>Name</th><th class="text-end">Questions</th></tr></thead>
+  <tbody>
+  {% for r in by_area_rows %}
+    <tr>
+      <td>{{ r.flk }}</td>
+      <td><code>{{ r.code }}</code></td>
+      <td>{{ r.name }}</td>
+      <td class="text-end">{{ r.c }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 class="h5 mt-4">Exporting and analysis</h2>
+<p>
+  <a class="btn btn-outline-primary me-2" href="{{ url_for('export') }}">Export PDF / Anki</a>
+  <a class="btn btn-outline-secondary" href="{{ url_for('upload_wrong_qids') }}">Upload my wrong-QIDs CSV → areas to improve</a>
+</p>
+<p class="small text-muted mt-2">
+  Export and analysis also run from the terminal if you prefer:
+</p>
+<pre class="small bg-light p-2 rounded"><code>python make_pdf.py --flk FLK1 --count 90 --output flk1_mock.pdf
+python make_anki.py --area BLP,DR --count 40 --output blp_dr.apkg
+python analyse_errors.py wrong_qids.csv</code></pre>
+{% endblock %}

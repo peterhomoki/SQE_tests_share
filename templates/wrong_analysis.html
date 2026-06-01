@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Areas to improve{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Areas to improve  <span class="text-muted small">({{ n }} wrong QIDs)</span></h1>
+
+<p class="mb-3">
+  <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('upload_wrong_qids') }}">
+    Replace upload
+  </a>
+  <a class="btn btn-sm btn-primary" href="{{ url_for('export') }}">
+    Build a PDF of these only
+  </a>
+</p>
+
+{% macro counter_table(title, counter) %}
+<h2 class="h5 mt-4">{{ title }}</h2>
+{% if counter %}
+<table class="table table-sm">
+  <thead><tr><th class="text-end" style="width:6em;">Errors</th><th>Category</th></tr></thead>
+  <tbody>
+    {% for label, count in counter.most_common(10) %}
+      <tr><td class="text-end">{{ count }}</td><td>{{ label }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="text-muted small">(no data at this level)</p>
+{% endif %}
+{% endmacro %}
+
+{{ counter_table("Top 10 weakest AREAS (lvl 1)", result.by_area) }}
+{{ counter_table("Top 10 weakest FIELDS (lvl 2)", result.by_field) }}
+{{ counter_table("Top 10 weakest SUBJECTS (lvl 3)", result.by_subject) }}
+{{ counter_table("Top 10 weakest SUB-MATTERS (lvl 4)", result.by_submatter) }}
+
+{% if result.missing_qids %}
+  <div class="alert alert-warning mt-3 small">
+    {{ result.missing_qids|length }} QID(s) in your CSV are not linked to any
+    taxonomy topic and were skipped: {{ result.missing_qids }}
+  </div>
+{% endif %}
+
+<details class="mt-4">
+  <summary class="text-muted small">Show the full text summary (handy for copying)</summary>
+  <pre class="bg-light p-3 rounded small mt-2">{{ summary_text }}</pre>
+</details>
+{% endblock %}

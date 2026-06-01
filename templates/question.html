@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Question {{ info.q.question_id }}{% endblock %}
+{% block content %}
+{% set q = info.q %}
+<a href="{{ url_for('browse') }}" class="small text-muted">← back to browse</a>
+<h1 class="h4 mb-2 mt-1">Question {{ q.question_id }}</h1>
+<div class="meta mb-3">
+  FLK {{ q.flk }} · Source: {{ q.source_file }} Q{{ q.source_question_num }}
+  {% if info.topics %}
+    · Topic:
+    {% for t in info.topics %}<span class="me-1">{% if t.code %}<code>{{ t.code }}</code>{% else %}{{ t.name }}{% endif %}{% if not loop.last %} ›{% endif %}</span>{% endfor %}
+  {% endif %}
+</div>
+
+<div class="stem mb-3">{{ q.stem }}</div>
+<p class="fw-bold">{{ q.lead_in }}</p>
+
+{% for o in info.options %}
+  {% set is_correct = (o.label == info.correct) %}
+  <div class="option-row d-block {% if is_correct %}correct{% endif %}">
+    <strong>{{ o.label }}.</strong> {{ o.text }}
+    {% if is_correct %}<span class="badge bg-success ms-2">CORRECT</span>{% endif %}
+    {% if o.explanation %}<div class="explanation">{{ o.explanation }}</div>{% endif %}
+  </div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Browse{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Browse questions</h1>
+
+<form method="get" action="{{ url_for('browse') }}" class="row g-2 align-items-end mb-3">
+  <div class="col-md-2">
+    <label class="form-label">FLK</label>
+    <select name="flk" class="form-select form-select-sm">
+      <option value="" {% if not flk %}selected{% endif %}>Any</option>
+      <option value="FLK1" {% if flk == 'FLK1' %}selected{% endif %}>FLK1</option>
+      <option value="FLK2" {% if flk == 'FLK2' %}selected{% endif %}>FLK2</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Area</label>
+    <select name="area" class="form-select form-select-sm">
+      <option value="" {% if not area %}selected{% endif %}>Any</option>
+      {% for code, name in areas %}
+        <option value="{{ code }}" {% if area == code %}selected{% endif %}>{{ code }} — {{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-5">
+    <label class="form-label">Text search (stem/lead-in)</label>
+    <input type="text" name="q" value="{{ q or '' }}" class="form-control form-control-sm">
+  </div>
+  <div class="col-md-auto">
+    <button class="btn btn-sm btn-primary">Filter</button>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('browse') }}">Clear</a>
+  </div>
+</form>
+
+<p class="text-muted small">
+  {{ total_match }} matching question(s){% if rows|length < total_match %}
+  · showing first {{ rows|length }}{% endif %}
+</p>
+
+<table class="table table-sm">
+  <thead><tr><th>QID</th><th>FLK</th><th>Lead-in</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td><a href="{{ url_for('question_detail', qid=r.question_id) }}">{{ r.question_id }}</a></td>
+      <td>{{ r.flk }}</td>
+      <td>{{ r.lead_in }}{% if r.lead_in|length >= 120 %}…{% endif %}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="3" class="text-muted">No questions match.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

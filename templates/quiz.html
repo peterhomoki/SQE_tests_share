@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Quiz{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">Practice quiz</h1>
+  <form method="get" action="{{ url_for('quiz') }}" class="d-inline-flex gap-2">
+    <select name="flk" class="form-select form-select-sm">
+      <option value="" {% if not flk %}selected{% endif %}>Any FLK</option>
+      <option value="FLK1" {% if flk == 'FLK1' %}selected{% endif %}>FLK1</option>
+      <option value="FLK2" {% if flk == 'FLK2' %}selected{% endif %}>FLK2</option>
+    </select>
+    <select name="area" class="form-select form-select-sm">
+      <option value="" {% if not area %}selected{% endif %}>Any area</option>
+      {% for code, name in areas %}
+        <option value="{{ code }}" {% if area == code %}selected{% endif %}>{{ code }}</option>
+      {% endfor %}
+    </select>
+    <button class="btn btn-sm btn-outline-secondary">Apply</button>
+  </form>
+</div>
+
+{% if info is none %}
+  <div class="alert alert-warning">
+    No questions match those filters. <a href="{{ url_for('quiz') }}">Clear filters</a>.
+  </div>
+{% else %}
+  {% set q = info.q %}
+  <div class="meta mb-2">
+    QID {{ q.question_id }} · FLK {{ q.flk }}
+    {% if info.topics %}
+      ·
+      {% for t in info.topics %}<span class="me-1">{% if t.code %}<code>{{ t.code }}</code>{% else %}{{ t.name }}{% endif %}{% if not loop.last %} ›{% endif %}</span>{% endfor %}
+    {% endif %}
+  </div>
+
+  <div class="stem mb-3">{{ q.stem }}</div>
+  <p class="fw-bold">{{ q.lead_in }}</p>
+
+  <form method="post" action="{{ url_for('quiz', flk=flk or '', area=area or '') }}">
+    <input type="hidden" name="qid" value="{{ q.question_id }}">
+    {% for o in info.options %}
+      {% set is_correct = (o.label == info.correct) %}
+      {% set chosen_this = (reveal and o.label == chosen) %}
+      {% set row_class = '' %}
+      {% if reveal and is_correct %}{% set row_class = 'correct' %}
+      {% elif chosen_this %}{% set row_class = 'chosen-wrong' %}
+      {% endif %}
+      <label class="option-row d-block {{ row_class }}">
+        {% if reveal %}
+          <strong>{{ o.label }}.</strong> {{ o.text }}
+          {% if is_correct %}<span class="badge bg-success ms-2">CORRECT</span>{% endif %}
+          {% if chosen_this and not is_correct %}<span class="badge bg-danger ms-2">YOUR ANSWER</span>{% endif %}
+          {% if o.explanation %}<div class="explanation">{{ o.explanation }}</div>{% endif %}
+        {% else %}
+          <input type="radio" name="answer" value="{{ o.label }}" required>
+          <strong>{{ o.label }}.</strong> {{ o.text }}
+        {% endif %}
+      </label>
+    {% endfor %}
+    {% if not reveal %}
+      <button class="btn btn-primary mt-2">Submit answer</button>
+    {% else %}
+      <div class="mt-3">
+        {% if is_correct %}
+          <div class="alert alert-success py-2">Correct.</div>
+        {% else %}
+          <div class="alert alert-danger py-2">Wrong — correct answer was {{ info.correct }}.</div>
+        {% endif %}
+        <a class="btn btn-primary" href="{{ url_for('quiz', flk=flk or '', area=area or '') }}">
+          Next question →
+        </a>
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('question_detail', qid=q.question_id) }}">View detail</a>
+      </div>
+    {% endif %}
+  </form>
+{% endif %}
+{% endblock %}

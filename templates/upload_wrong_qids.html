@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Upload your wrong QIDs{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Upload your wrong-QIDs CSV</h1>
+
+<p>
+  Provide a CSV file listing the QIDs of questions you got wrong. The format is
+  intentionally minimal — one header row, then one QID per line:
+</p>
+
+<pre class="bg-light p-3 rounded small">qid
+4
+6
+10
+17
+…</pre>
+
+<p>
+  Once loaded, the QIDs are stored in your browser session and used by:
+</p>
+<ul>
+  <li><a href="{{ url_for('wrong_analysis') }}">/wrong-analysis</a> — areas-to-improve summary</li>
+  <li><a href="{{ url_for('export') }}">/export</a> — tick "Only my wrong questions" to make a focused PDF / Anki deck</li>
+</ul>
+
+<form method="post" enctype="multipart/form-data" class="mb-4">
+  <div class="mb-3">
+    <label class="form-label">CSV file (max 256 KB)</label>
+    <input type="file" name="file" class="form-control" accept=".csv,text/csv" required>
+  </div>
+  <button class="btn btn-primary" type="submit">Upload</button>
+  {% if n_existing %}
+    <span class="text-muted ms-3">
+      Currently loaded: <strong>{{ n_existing }}</strong> QIDs
+      (uploading replaces this list)
+    </span>
+  {% endif %}
+</form>
+
+<p class="small text-muted">
+  Where to get a wrong-QIDs CSV: after practising in the <a href="{{ url_for('quiz') }}">Quiz</a>,
+  copy the wrong-QIDs listed on the <a href="{{ url_for('score') }}">Score</a> page,
+  or use any external practice tool whose output you can export as CSV.
+  The QID column header must be exactly <code>qid</code> (lowercase).
+</p>
+{% endblock %}

@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Export{% endblock %}
+{% block content %}
+<h1 class="h4 mb-3">Export a PDF or Anki deck</h1>
+
+<p class="text-muted small">
+  Generates a randomised set of questions and bundles them for offline practice.
+  The questions are shuffled, and within each question the option letters are
+  shuffled too, so the correct letter is not the same as in the database.
+  Generation runs server-side via <code>make_pdf.py</code> / <code>make_anki.py</code>;
+  when it finishes you'll get a download link.
+</p>
+
+<form method="post" action="{{ url_for('export') }}" class="row g-3 mb-4">
+  <div class="col-md-4">
+    <label class="form-label">Format</label>
+    <select name="kind" class="form-select">
+      <option value="pdf">Printable PDF</option>
+      <option value="anki">Anki deck (.apkg)</option>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">FLK (optional)</label>
+    <select name="flk" class="form-select">
+      <option value="">All FLKs</option>
+      <option value="FLK1">FLK1 only</option>
+      <option value="FLK2">FLK2 only</option>
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Area (optional)</label>
+    <select name="area" class="form-select">
+      <option value="">Any area</option>
+      {% for code, name in areas %}
+        <option value="{{ code }}">{{ code }} — {{ name }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-4">
+    <label class="form-label">Count (blank = all matching)</label>
+    <input type="number" name="count" min="1" class="form-control" placeholder="e.g. 30">
+  </div>
+  <div class="col-md-8">
+    <label class="form-label">Only my wrong questions
+      {% if n_wrong %}
+        <span class="badge bg-info">{{ n_wrong }} loaded</span>
+      {% else %}
+        <span class="text-muted small">(upload a CSV first via "My errors")</span>
+      {% endif %}
+    </label>
+    <div class="form-check mt-1">
+      <input class="form-check-input" type="checkbox" name="only_wrong" value="1" id="only_wrong" {% if not n_wrong %}disabled{% endif %}>
+      <label class="form-check-label" for="only_wrong">
+        Restrict the export to the QIDs in your uploaded wrong-list
+      </label>
+    </div>
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary" type="submit">Generate</button>
+  </div>
+</form>
+
+<p class="small text-muted">
+  Generated files live in the <code>downloads/</code> folder next to <code>app.py</code>
+  and are also reachable from the link the next page produces. Older files are not
+  automatically deleted — clean up the folder when you're done.
+</p>
+{% endblock %}
